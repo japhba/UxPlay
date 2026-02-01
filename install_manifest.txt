@@ -1,0 +1,8 @@
+/usr/local/bin/uxplay
+/usr/local/share/man/man1/uxplay.1
+/usr/local/share/doc/uxplay/README.md
+/usr/local/share/doc/uxplay/README.txt
+/usr/local/share/doc/uxplay/README.html
+/usr/local/share/doc/uxplay/LICENSE
+/usr/local/share/doc/uxplay/llhttp/LICENSE-MIT
+/usr/local/share/doc/uxplay/systemd/uxplay.service

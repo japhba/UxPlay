@@ -1,0 +1,2 @@
+/Library/Developer/CommandLineTools/usr/bin/ar qc librenderers.a CMakeFiles/renderers.dir/audio_renderer.c.o CMakeFiles/renderers.dir/video_renderer.c.o
+/Library/Developer/CommandLineTools/usr/bin/ranlib librenderers.a

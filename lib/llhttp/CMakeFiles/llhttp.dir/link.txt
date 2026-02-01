@@ -1,0 +1,2 @@
+/Library/Developer/CommandLineTools/usr/bin/ar qc libllhttp.a CMakeFiles/llhttp.dir/api.c.o CMakeFiles/llhttp.dir/http.c.o CMakeFiles/llhttp.dir/llhttp.c.o
+/Library/Developer/CommandLineTools/usr/bin/ranlib libllhttp.a
