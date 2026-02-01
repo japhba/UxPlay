@@ -371,7 +371,7 @@ raop_rtp_mirror_thread(void *arg)
                 readstart = 0;
             }
 
-            while (readstart < payload_size) {
+            while ((int) readstart < payload_size) {
                 // Payload data
                 unsigned char *pos = payload + readstart;
                 ret = recv(stream_fd, CAST pos, payload_size - readstart, 0);
@@ -438,7 +438,11 @@ raop_rtp_mirror_thread(void *arg)
 		
                 if (prepend_sps_pps) {
                     assert(sps_pps);
-                    payload_out = (unsigned char*)  malloc(payload_size + sps_pps_len);
+                    payload_out = (unsigned char*) malloc(payload_size + sps_pps_len);
+                    if (!payload_out) {
+                        printf("Memory allocation failed (payload_out)\n");
+                        exit(1);
+                    }
                     payload_decrypted = payload_out + sps_pps_len;
                     memcpy(payload_out, sps_pps, sps_pps_len);
                     free (sps_pps);
@@ -852,7 +856,7 @@ raop_rtp_mirror_thread(void *arg)
     if (unsupported_codec) {
         closesocket(raop_rtp_mirror->mirror_data_sock);
         raop_rtp_mirror_stop(raop_rtp_mirror);
-        raop_rtp_mirror->callbacks.video_reset(raop_rtp_mirror->callbacks.cls, false);
+        raop_rtp_mirror->callbacks.video_reset(raop_rtp_mirror->callbacks.cls, RESET_TYPE_RTP_SHUTDOWN);
     }
 
     return 0;

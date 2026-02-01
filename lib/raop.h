@@ -41,6 +41,8 @@ typedef struct playback_info_s {
     uint32_t stallcount;
     double duration;
     double position;
+    double seek_start;
+    double seek_duration;
     float rate;
     bool ready_to_play;
     bool playback_buffer_empty;
@@ -58,6 +60,13 @@ typedef enum video_codec_e {
     VIDEO_CODEC_H265
 } video_codec_t;
 
+typedef enum reset_type_e {
+  RESET_TYPE_NOHOLD,
+  RESET_TYPE_RTP_SHUTDOWN,
+  RESET_TYPE_HLS_SHUTDOWN,
+  RESET_TYPE_HLS_EOS
+} reset_type_t;
+
 struct raop_callbacks_s {
     void* cls;
 
@@ -67,7 +76,7 @@ struct raop_callbacks_s {
     void  (*video_resume)(void *cls);
     void  (*conn_feedback) (void *cls);
     void  (*conn_reset) (void *cls, int reason);
-    void  (*video_reset) (void *cls, bool hls_shutdown);
+    void  (*video_reset) (void *cls, reset_type_t reset_type);
   
   
     /* Optional but recommended callback functions (probably not optional, check this)*/
@@ -108,9 +117,9 @@ raop_ntp_t *raop_ntp_init(logger_t *logger, raop_callbacks_t *callbacks, const c
                           timing_protocol_t *time_protocol);
 
 airplay_video_t *airplay_video_init(raop_t *raop, unsigned short port, const char *lang);
-int get_playlist_by_uuid(raop_t *raop, const char *uuid);
 char *raop_get_lang(raop_t *raop);
 uint64_t get_local_time();
+void raop_handle_eos(raop_t *raop);
 
 RAOP_API raop_t *raop_init(raop_callbacks_t *callbacks);
 RAOP_API int raop_init2(raop_t *raop, int nohold, const char *device_id, const char *keyfile);
@@ -131,7 +140,6 @@ RAOP_API void raop_destroy(raop_t *raop);
 RAOP_API void raop_remove_known_connections(raop_t * raop);
 RAOP_API void raop_remove_hls_connections(raop_t * raop);
 RAOP_API void raop_destroy_airplay_video(raop_t *raop, int id);
-RAOP_API int raop_current_playlist_delete(raop_t *raop);
 RAOP_API void raop_playlist_remove(raop_t *raop, void *airplay_video, float position);
   
 #ifdef __cplusplus

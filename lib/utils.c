@@ -21,6 +21,8 @@
 #include <assert.h>
 #include <time.h>
 #include <stdint.h>
+#include <limits.h>
+
 #define SECOND_IN_NSECS 1000000000UL
 
 char *
@@ -211,7 +213,7 @@ char *utils_data_to_string(const unsigned char *data, int datalen, int chars_per
     n--;
     p++;
     assert(p == &(str[len]));
-    assert(len == strlen(str));
+    assert(len == (int) strlen(str));
     return str;
 }
 
@@ -288,6 +290,10 @@ char *utils_strip_data_from_plist_xml(char *plist_xml) {
         return NULL;
     } else {
         xml = (char *) calloc((len + 1), sizeof(char));
+        if (!xml) {
+          printf("memory allocation failed (xml)\n");
+          exit(1);
+        }
     }
     char *ptr1 = plist_xml;
     char *ptr2 = xml;
@@ -339,4 +345,18 @@ const char *gmt_time_string() {
     } else {
         return "";
     }
+}
+
+int parse_int(const char * str) {
+    /* verify that a string represents a non-negative int, and return it, or return -1 */
+    char *end_ptr;
+    assert(str);
+    long val = strtol(str, &end_ptr, 10);
+    if ((val == 0 && end_ptr == str) || *end_ptr != '\0') {
+        return -1;
+    }
+    if (val < 0 || val > INT_MAX) {
+        return -1;
+    }
+    return (int) val;
 }

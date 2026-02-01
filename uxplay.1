@@ -1,4 +1,4 @@
-.TH UXPLAY "1" "2025-11-10" "UxPlay 1.73" "User Commands"
+.TH UXPLAY "1" "2026-01-26" "UxPlay 1.73" "User Commands"
 .SH NAME
 uxplay \- start AirPlay server
 .SH SYNOPSIS
@@ -14,6 +14,10 @@ UxPlay 1.73: An open\-source AirPlay mirroring (+ audio streaming) server:
 \fB\-nh\fR       Do \fBNOT\fR append "@\fIhostname\fR" at end of AirPlay server name
 .TP
 \fB\-h265\fR     Support h265 (4K) video (with h265 versions of h264 plugins)
+.TP
+\fB\-mp4\fI [fn]\fR Record (non-HLS)audio/video to mp4 file "fn.[n].[format].mp4"
+.IP
+   n=1,2,.. format = H264/5, ALAC/AAC. Default fn="recording"
 .TP
 \fB\-hls\fR [v]  Support HTTP Live Streaming (HLS), YouTube app video only:
 .IP
@@ -107,6 +111,12 @@ UxPlay 1.73: An open\-source AirPlay mirroring (+ audio streaming) server:
    is the remaining pipeline, starting with rtph26*pay options:
 .IP
    e.g. "config-interval=1 ! udpsink host=127.0.0.1 port=5000"
+.TP
+\fB\-artp\fI pl\fR  Use rtpL16pay to send decoded audio elsewhere: "pl"
+.IP
+   is the remaining pipeline, starting with rtpL16pay options:
+.IP
+   e.g. "pt=96 ! udpsink host=127.0.0.1 port=5002"
 .PP
 .TP
 \fB\-v4l2\fR     Use Video4Linux2 for GPU hardware h264 video decoding.
