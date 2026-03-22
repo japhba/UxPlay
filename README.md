@@ -1,5 +1,23 @@
 # UxPlay 1.73: AirPlay-Mirror and AirPlay-Audio server for Linux, macOS, and Unix (also runs on Windows).
 
+## Bluetooth LE Beacon Mode (eduroam / mDNS-restricted networks)
+
+On networks like **eduroam** that block mDNS, you can use Bluetooth LE to let nearby iOS/macOS devices discover the UxPlay server:
+
+```bash
+# 1. Start UxPlay with the -ble flag (allows it to run even when mDNS fails)
+uxplay -ble
+
+# 2. In a separate terminal, run the macOS Bluetooth beacon script
+python3 Bluetooth_LE_beacon/macos/uxplay-beacon.py
+```
+
+The beacon broadcasts the server's IP address and port over Bluetooth LE so that Apple devices on the same network can find and connect to UxPlay without DNS-SD.
+
+**Requires:** macOS with Bluetooth enabled, `pip install pyobjc-framework-CoreBluetooth`
+
+---
+
 ### **Now developed at the GitHub site <https://github.com/FDH2/UxPlay> (where ALL user issues should be posted, and latest versions can be found).**
 
 -  **NEW in v1.73** (January 2026):

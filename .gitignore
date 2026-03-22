@@ -1,2 +1,35 @@
 build/
 .vscode/
+
+# macOS
+.DS_Store
+
+# CMake build artifacts (in-source builds)
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+cmake_uninstall.cmake
+install_manifest.txt
+Makefile
+lib/CMakeFiles/
+lib/Makefile
+lib/cmake_install.cmake
+lib/*.a
+lib/llhttp/CMakeFiles/
+lib/llhttp/Makefile
+lib/llhttp/cmake_install.cmake
+lib/llhttp/*.a
+lib/playfair/CMakeFiles/
+lib/playfair/Makefile
+lib/playfair/cmake_install.cmake
+lib/playfair/*.a
+renderers/CMakeFiles/
+renderers/Makefile
+renderers/cmake_install.cmake
+renderers/*.a
+
+# Compiled objects and binaries
+*.o
+*.o.d
+*.a
+uxplay
