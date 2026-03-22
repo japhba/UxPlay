@@ -488,6 +488,7 @@ void video_renderer_start() {
     } 
     /* when not hls, start both h264 and h265 pipelines; will shut down the "wrong" one when we know the codec */
     for (int i = 0; i < n_renderers; i++) {
+        if (!renderer_type[i]) continue;
         gst_element_set_state (renderer_type[i]->pipeline, GST_STATE_PAUSED);
         gst_element_get_state(renderer_type[i]->pipeline, &state, NULL, 1000 * GST_MSECOND);
         state_name = gst_element_state_get_name(state);
@@ -1104,8 +1105,11 @@ void video_renderer_seek(float position) {
 
 unsigned int video_renderer_listen(void *loop, int id) {
     g_assert(id >= 0 && id < n_renderers);
+    if (!renderer_type[id] || !renderer_type[id]->bus) {
+        return 0;
+    }
     return (unsigned int) gst_bus_add_watch(renderer_type[id]->bus,(GstBusFunc)
-                                            gstreamer_video_pipeline_bus_callback, (gpointer) loop);    
+                                            gstreamer_video_pipeline_bus_callback, (gpointer) loop);
 }
 
 bool video_renderer_eos_watch() {
