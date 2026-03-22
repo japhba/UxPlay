@@ -1,5 +1,24 @@
 # UxPlay 1.73: AirPlay-Mirror and AirPlay-Audio server for Linux, macOS, and Unix (also runs on Windows).
 
+## Resolution and the `-h265` flag
+
+Even on devices that ultimately send H264, enabling `-h265` significantly increases the stream resolution offered by the client. In testing with an iPad7,3 (iOS 17.7):
+
+| Flag | Resolution |
+|------|-----------|
+| without `-h265` | 1920x1080 |
+| with `-h265` | 2880x2160 |
+
+The iPad never actually sends H265 video — it falls back to H264 — but advertising H265 support signals a high-capability receiver (like an Apple TV 4K), causing the device to offer a higher resolution stream.
+
+**Recommended launch command for iPads:**
+```bash
+uxplay -h265 -vsync no
+```
+
+The `-vsync no` flag is important: at high resolutions, GStreamer's sync mode can cause initial frame drops, which triggers a QoS cascade where the client stops sending full frames entirely, resulting in a frozen picture.
+
+---
 ### **Now developed at the GitHub site <https://github.com/FDH2/UxPlay> (where ALL user issues should be posted, and latest versions can be found).**
 
 -  **NEW in v1.73** (January 2026):
