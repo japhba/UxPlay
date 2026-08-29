@@ -1,0 +1,65 @@
+name: macOS app
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      skip_smoke_test:
+        description: Skip the 30-second server smoke test
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+env:
+  GST_VERSION: 1.28.0
+  HOMEBREW_NO_ANALYTICS: 1
+  HOMEBREW_NO_INSTALL_CLEANUP: 1
+
+jobs:
+  build-app:
+    name: Build UxPlay.app (arm64)
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          # full history so `git describe --tags` finds the version
+          fetch-depth: 0
+
+      - name: Install Homebrew dependencies
+        run: brew install cmake openssl@3 libplist
+
+      - name: Install official GStreamer ${{ env.GST_VERSION }} (runtime + devel)
+        run: |
+          base="https://gstreamer.freedesktop.org/data/pkg/osx/${GST_VERSION}"
+          curl -fL --retry 3 -O "${base}/gstreamer-1.0-${GST_VERSION}-universal.pkg"
+          curl -fL --retry 3 -O "${base}/gstreamer-1.0-devel-${GST_VERSION}-universal.pkg"
+          sudo installer -pkg "gstreamer-1.0-${GST_VERSION}-universal.pkg" -target /
+          sudo installer -pkg "gstreamer-1.0-devel-${GST_VERSION}-universal.pkg" -target /
+          rm -f gstreamer-1.0-*.pkg
+
+      - name: Build, bundle, and verify UxPlay.app
+        env:
+          SKIP_SMOKE_TEST: ${{ inputs.skip_smoke_test == true && '1' || '' }}
+        run: ./packaging/macos/build-app.sh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: UxPlay-macos-arm64
+          path: dist/UxPlay-*-macos-arm64.zip
+          if-no-files-found: error
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/UxPlay-*-macos-arm64.zip
+          generate_release_notes: true
+          body: |
+            Self-contained macOS app (Apple Silicon). Download the zip, unzip,
+            and right-click > Open on first launch (the build is not notarized;
+            see the "Download the macOS app" section of the README).

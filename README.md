@@ -19,6 +19,53 @@ uxplay -h265 -vsync no
 The `-vsync no` flag is important: at high resolutions, GStreamer's sync mode can cause initial frame drops, which triggers a QoS cascade where the client stops sending full frames entirely, resulting in a frozen picture.
 
 ---
+
+## Download the macOS app
+
+A self-contained macOS app, **`UxPlay.app`**, is built by GitHub Actions and
+attached to [GitHub Releases](../../releases) as
+`UxPlay-<version>-macos-arm64.zip` (Apple Silicon, macOS 13 or later).  It
+bundles the uxplay binary together with the parts of the official GStreamer
+runtime it needs, so nothing else has to be installed.
+
+**Install:** download the zip from the latest release, unzip it, and drag
+`UxPlay.app` to `/Applications` (or anywhere).
+
+**First launch (Gatekeeper):** the app is not notarized, so macOS will refuse
+a plain double-click at first.  Either right-click (Ctrl-click) `UxPlay.app`
+and choose **Open**, then **Open** again  -- or after a refused launch go to
+**System Settings → Privacy & Security** and press **Open Anyway**.
+Alternatively, remove the quarantine flag in a terminal:
+
+    xattr -dr com.apple.quarantine /Applications/UxPlay.app
+
+**What it does:** on launch the app opens a Terminal window running
+
+    uxplay -p2p -h265 -vsync no -vs "osxvideosink force-aspect-ratio=true"
+
+and shows the one-time PIN there; on the iPad/iPhone pick the receiver in
+Screen Mirroring and enter the PIN.  `-p2p` advertises the receiver over AWDL
+(peer-to-peer WiFi) as well as the local network, so it also works on networks
+that block mDNS (e.g. eduroam).  Keep the Terminal window open while
+mirroring; press Ctrl-C in it (or close it) to stop the server.
+
+**Requirements:** macOS 13+ on Apple Silicon, and AirPlay Receiver enabled in
+**System Settings → General → AirDrop & Continuity** (uxplay reports the
+current state of this setting when it starts).
+
+**Extra options:** put default options in a `~/.uxplayrc` startup file (one
+option per line, see below), set them in the `UXPLAY_ARGS` environment
+variable, or run the app from a terminal and pass them directly:
+
+    /Applications/UxPlay.app/Contents/Resources/run-uxplay.sh -n MyReceiver
+
+Notes: the bundled GStreamer covers mirror and audio (AAC/ALAC) modes,
+including cover-art display; HLS video (e.g. the YouTube app) is not included
+in the app -- build UxPlay from source with a full GStreamer install if you
+need that.  The app is ad-hoc signed unless the release was built with a
+Developer ID (see `packaging/macos/build-app.sh`).
+
+---
 ### **Now developed at the GitHub site <https://github.com/FDH2/UxPlay> (where ALL user issues should be posted, and latest versions can be found).**
 
 -   **NEW in v 1.74 (Experimental) (June 2026)
