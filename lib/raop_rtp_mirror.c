@@ -23,11 +23,6 @@
 #include <assert.h>
 #include <errno.h>
 #include <stdbool.h>
-#ifdef _WIN32
-#include <winsock2.h>
-#else
-#include <netinet/tcp.h>
-#endif
 
 #include "raop.h"
 #include "netutils.h"
@@ -461,7 +456,10 @@ raop_rtp_mirror_thread(void *arg)
                 int nalus_count = 0;
                 while (nalu_size < payload_size) {
                     int nc_len = byteutils_get_int_be(payload_decrypted, nalu_size);
-                    if (nc_len < 0 || nalu_size + 4 > payload_size) {
+                    /* nc_len is read from the payload, so it is only a
+                     * length if the unit it claims fits in what is left. */
+                    if (nc_len < 0 || nalu_size + 4 > payload_size ||
+                        nc_len > payload_size - nalu_size - 4) {
                         valid_data = false;
                         break;
                     }
@@ -809,12 +807,6 @@ raop_rtp_mirror_thread(void *arg)
                         uint32_t plist_len = 0;
                         plist_t root_node = NULL;
                         plist_from_bin((char *) payload, plist_size, &root_node);
-                        if (raop_rtp_mirror->callbacks.mirror_video_activity) {
-                            double txusage = 0.0;
-                            plist_t tx_usage_avg_node = plist_dict_get_item(root_node, "txUsageAvg");
-                            plist_get_real_val(tx_usage_avg_node, &txusage);
-                            raop_rtp_mirror->callbacks.mirror_video_activity(raop_rtp_mirror->callbacks.cls, &txusage);
-                        }
                         if (raop_rtp_mirror->show_client_FPS_data) {
                             plist_to_xml(root_node, &plist_xml, &plist_len);
                             logger_log(raop_rtp_mirror->logger, LOGGER_INFO, "%s", plist_xml);
@@ -840,13 +832,16 @@ raop_rtp_mirror_thread(void *arg)
     }
     /* Close the stream file descriptor */
     if (stream_fd != -1) {
-        closesocket(stream_fd);
+        CLOSESOCKET(stream_fd);
     }
 
     // Ensure running reflects the actual state
     MUTEX_LOCK(raop_rtp_mirror->run_mutex);
     raop_rtp_mirror->running = false;
     MUTEX_UNLOCK(raop_rtp_mirror->run_mutex);
+    if (raop_rtp_mirror->callbacks.mirror_video_running) {
+        raop_rtp_mirror->callbacks.mirror_video_running(raop_rtp_mirror->callbacks.cls, false);
+    }
 
     logger_log(raop_rtp_mirror->logger, LOGGER_DEBUG, "raop_rtp_mirror exiting TCP thread");
     if (conn_reset&& raop_rtp_mirror->callbacks.conn_reset) {
@@ -854,7 +849,7 @@ raop_rtp_mirror_thread(void *arg)
     }
 
     if (unsupported_codec) {
-        closesocket(raop_rtp_mirror->mirror_data_sock);
+        CLOSESOCKET(raop_rtp_mirror->mirror_data_sock);
         raop_rtp_mirror_stop(raop_rtp_mirror);
         raop_rtp_mirror->callbacks.video_reset(raop_rtp_mirror->callbacks.cls, RESET_TYPE_RTP_SHUTDOWN);
     }
@@ -888,7 +883,7 @@ raop_rtp_mirror_init_socket(raop_rtp_mirror_t *raop_rtp_mirror, int use_ipv6)
     return 0;
 
     sockets_cleanup:
-    if (dsock != -1) closesocket(dsock);
+    if (dsock != -1) CLOSESOCKET(dsock);
     return -1;
 }
 
@@ -925,6 +920,9 @@ raop_rtp_mirror_start(raop_rtp_mirror_t *raop_rtp_mirror, unsigned short *mirror
     /* Create the thread and initialize running values */
     raop_rtp_mirror->running = 1;
     raop_rtp_mirror->joined = 0;
+    if (raop_rtp_mirror->callbacks.mirror_video_running) {
+        raop_rtp_mirror->callbacks.mirror_video_running(raop_rtp_mirror->callbacks.cls, true);
+    }
 
     THREAD_CREATE(raop_rtp_mirror->thread_mirror, raop_rtp_mirror_thread, raop_rtp_mirror);
     MUTEX_UNLOCK(raop_rtp_mirror->run_mutex);
@@ -947,7 +945,7 @@ void raop_rtp_mirror_stop(raop_rtp_mirror_t *raop_rtp_mirror) {
     THREAD_JOIN(raop_rtp_mirror->thread_mirror);
 
     if (raop_rtp_mirror->mirror_data_sock != -1) {
-        closesocket(raop_rtp_mirror->mirror_data_sock);
+        CLOSESOCKET(raop_rtp_mirror->mirror_data_sock);
         raop_rtp_mirror->mirror_data_sock = -1;
     }
 

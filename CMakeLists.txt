@@ -1,8 +1,4 @@
-if ( APPLE )
-  cmake_minimum_required( VERSION 3.13 )
-else ()
-  cmake_minimum_required( VERSION 3.10 )
-endif ()
+cmake_minimum_required( VERSION 3.13 )
 
 project( uxplay )
 
@@ -37,15 +33,39 @@ if( UNIX AND NOT APPLE )
   if (DBUS_FOUND )
       add_definitions(-DDBUS )
       include_directories(${DBUS_INCLUDE_DIRS})
+      #FreeBSD has this Library in /usr/local/lib
+      find_library (DBUS_LIBRARY NAMES dbus-1 PATHS /usr/local/lib)
+      if (NOT DBUS_LIBRARY)
+      	 message(FATAL_ERROR "libdbus-1 not found")
+      endif()
   endif()
 endif()
 
 if( UNIX AND NOT APPLE )
-  add_definitions( -DSUPPRESS_AVAHI_COMPAT_WARNING )
   # convert AirPlay colormap 1:3:7:1 to sRGB (1:1:7:1), needed on Linux and BSD
   add_definitions( -DFULL_RANGE_RGB_FIX )
 else()
   set( CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE )
+endif()
+
+if (USE_DNS_SD OR ( APPLE AND NOT USE_MDNS ))
+  message ( STATUS "******** using Bounjour/Apple dns_sd.h for Service Discovery")
+  if ( APPLE )
+    add_definitions( -DUXPLAY_HAVE_APPLE_P2P )
+  endif()
+  add_subdirectory( lib/dns_sd)
+  if (UNIX AND NOT APPLE)
+    add_definitions( -DSUPPRESS_AVAHI_COMPAT_WARNING )
+  endif()	     
+  if ( APPLE )	
+       message ( STATUS "******** use \"cmake -DUSE_MDNS=1\" to build using UxPlay mdnsd code instead of Apple Bonjour" )	
+  endif()
+else() 
+  message ( STATUS "******** using internal minimal mDNSResponder implementation (lib/mdnsd) for Service Discovery")
+  if (NOT APPLE)
+     message ( STATUS "******** use \"cmake -DUSE_DNS_SD=1\" to build with the previously-used Apple/Avahi dns-sd.h code")
+  endif()
+  add_subdirectory( lib/mdnsd)
 endif()
 
 add_subdirectory( lib/llhttp )
@@ -59,14 +79,9 @@ if  ( GST_MACOS )
 endif()
 
 add_executable( uxplay uxplay.cpp )
-target_link_libraries( uxplay
-                   renderers
-                   airplay
-		   )
+target_link_libraries( uxplay renderers airplay )
 if (DBUS_FOUND)
-target_link_libraries( uxplay
-		     ${DBUS_LIBRARIES}
-		     )
+      target_link_libraries( uxplay ${DBUS_LIBRARY})
 endif()
 
 install( TARGETS  uxplay RUNTIME DESTINATION bin )
@@ -74,21 +89,31 @@ install( FILES uxplay.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1 )
 install( FILES README.md README.txt README.html LICENSE DESTINATION ${CMAKE_INSTALL_DOCDIR} ) 
 install( FILES lib/llhttp/LICENSE-MIT DESTINATION ${CMAKE_INSTALL_DOCDIR}/llhttp )
 install( FILES uxplay.service DESTINATION ${CMAKE_INSTALL_DOCDIR}/systemd ) 
-
-if (DBUS_FOUND)
-install( FILES Bluetooth_LE_beacon/dbus/uxplay-beacon.py
+install( FILES Bluetooth_LE_beacon/uxplay-beacon.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1 )
+install( FILES Bluetooth_LE_beacon/uxplay-beacon.py
          DESTINATION bin
          PERMISSIONS OWNER_EXECUTE OWNER_WRITE OWNER_READ GROUP_EXECUTE GROUP_READ  WORLD_EXECUTE WORLD_READ)
-install( FILES Bluetooth_LE_beacon/dbus/uxplay-beacon.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1 )
+install( FILES Bluetooth_LE_beacon/uxplay_beacon_module_BleuIO.py
+         DESTINATION bin
+         PERMISSIONS  OWNER_WRITE OWNER_READ GROUP_READ WORLD_READ)
+
+if (DBUS_FOUND)
+install( FILES Bluetooth_LE_beacon/uxplay_beacon_module_BlueZ.py
+         DESTINATION bin
+         PERMISSIONS OWNER_WRITE OWNER_READ GROUP_READ WORLD_READ)
 endif()
 
 if (WIN32)
-install( FILES Bluetooth_LE_beacon/winrt/uxplay-beacon.py
+install( FILES Bluetooth_LE_beacon/uxplay_beacon_module_winrt.py
          DESTINATION bin
-         PERMISSIONS OWNER_EXECUTE OWNER_WRITE OWNER_READ GROUP_EXECUTE GROUP_READ  WORLD_EXECUTE WORLD_READ)
-install( FILES Bluetooth_LE_beacon/winrt/uxplay-beacon.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1 )
+         PERMISSIONS OWNER_WRITE OWNER_READ GROUP_READ WORLD_READ)
 endif()
 
+if (UNIX AND NOT APPLE)
+install( FILES Bluetooth_LE_beacon/uxplay_beacon_module_HCI.py
+         DESTINATION bin
+         PERMISSIONS OWNER_WRITE OWNER_READ GROUP_READ WORLD_READ)
+endif()
 
 
 # uninstall target

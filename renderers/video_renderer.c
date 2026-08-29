@@ -77,7 +77,7 @@ typedef enum {
 #define NCODECS  3   /* renderers for h264,h265, and jpeg images */
 
 struct video_renderer_s {
-    GstElement *appsrc, *pipeline;
+    GstElement *appsrc, *pipeline, *textsrc;
     GstBus *bus;
     const char *codec;
     bool autovideo;
@@ -222,6 +222,33 @@ GstElement *make_video_sink(const char *videosink, const char *videosink_options
     return video_sink;
 }
 
+#ifdef NEED_G_STRING_REPLACE
+guint
+g_string_replace (GString     *string,
+                  const gchar *find,
+                  const gchar *replace,
+                  guint        limit)
+{
+  if (find == NULL || find[0] == '\0')
+    return 0;
+
+  gchar **parts = g_strsplit (string->str, find, limit + 1);
+  if (parts == NULL || parts[0] == NULL)
+    {
+      g_strfreev (parts);
+      return 0;
+    }
+
+  gchar *joined = g_strjoinv (replace, parts);
+  g_strfreev (parts);
+
+  g_string_assign (string, joined);
+  g_free (joined);
+
+  return g_strv_length (parts);
+}
+#endif
+
 void video_renderer_init(logger_t *render_logger, const char *server_name, videoflip_t videoflip[2], const char *parser, const char * rtp_pipeline,
                           const char *decoder, const char *converter, const char *videosink, const char *videosink_options, 
                           bool initial_fullscreen, bool video_sync, bool h265_support, bool coverart_support, guint playbin_version, const char *uri) {
@@ -278,6 +305,7 @@ void video_renderer_init(logger_t *render_logger, const char *server_name, video
         renderer_type[i]->id = i;
         renderer_type[i]->bus = NULL;
         renderer_type[i]->appsrc = NULL;
+        renderer_type[i]->textsrc = NULL;
         renderer_type[i]->uri = NULL;
         renderer_type[i]->eos = FALSE;
         if (hls_video) {
@@ -350,7 +378,7 @@ void video_renderer_init(logger_t *render_logger, const char *server_name, video
                 g_string_append(launch, " ! ");
                 g_string_append(launch, "videoscale ! ");
                 if (jpeg_pipeline) {
-                    g_string_append(launch, " imagefreeze allow-replace=TRUE ! ");
+                    g_string_append(launch, " imagefreeze allow-replace=TRUE ! textoverlay name=metadata_overlay ! ");
                 }
                 g_string_append(launch, videosink);
                 g_string_append(launch, " name=");
@@ -402,6 +430,10 @@ void video_renderer_init(logger_t *render_logger, const char *server_name, video
             g_string_free(launch, TRUE);
             gst_caps_unref(caps);
             gst_object_unref(clock);
+            if (jpeg_pipeline) {
+                 renderer_type[i]->textsrc = gst_bin_get_by_name(GST_BIN(renderer_type[i]->pipeline), "metadata_overlay");
+                 g_object_set(G_OBJECT(renderer_type[i]->textsrc), "text", "", "shaded-background", TRUE, "font-desc", "Sans, 16",  NULL);
+            }
         }	
 #ifdef X_DISPLAY_FIX
         use_x11 = (strstr(videosink, "xvimagesink") || strstr(videosink, "ximagesink") || auto_videosink);
@@ -658,6 +690,34 @@ void video_renderer_stop() {
      }
 }
 
+void video_renderer_set_device_model(const char *model, const char *name) {
+    // Device frame not supported in GStreamer renderer
+    (void)model;
+    (void)name;
+}
+
+void video_renderer_set_track_metadata(const char *title, const char *artist, const char *album) {
+    // Track metadata display superimposed on coverart is now supported in GStreamer renderer
+    GString *metadata = g_string_new("");
+    if (artist) {
+        g_string_append(metadata, artist);
+    }
+    if (artist && title) {
+        g_string_append(metadata, ": ");
+    }
+    if (title) {
+        g_string_append(metadata, "\"");
+        g_string_append(metadata, title);
+        g_string_append(metadata, "\"");
+    }
+    
+    g_string_replace (metadata, "&", "&amp;", 0);   //fix pango problem with "&" in text
+    if (renderer && renderer->textsrc && (artist || title)) {
+        g_object_set(G_OBJECT(renderer->textsrc), "text", metadata->str, NULL);
+    }
+    g_string_free(metadata, TRUE);
+}
+
 static void video_renderer_destroy_instance(video_renderer_t *renderer) {
     if (renderer) {
         logger_log(logger, LOGGER_DEBUG,"destroying renderer instance %p codec=%s ", renderer, renderer->codec);
@@ -679,6 +739,10 @@ static void video_renderer_destroy_instance(video_renderer_t *renderer) {
             gst_object_unref (renderer->appsrc);
             renderer->appsrc = NULL;
         }
+        if (renderer->textsrc) {
+            gst_object_unref (renderer->textsrc);
+            renderer->textsrc = NULL;
+        }	
         gst_object_unref(renderer->bus);
         gst_object_unref(renderer->pipeline);
 #ifdef X_DISPLAY_FIX
@@ -1118,4 +1182,13 @@ bool video_renderer_eos_watch() {
 	return true;
     }
     return false; 
+}
+
+void video_renderer_hls_set_volume(double volume) {
+    if (!renderer || strcmp(renderer->codec, hls)) {
+       return;
+    }
+    volume = (volume > 10.0) ? 10.0 : volume;
+    volume = (volume < 0.0) ? 0.0 : volume;
+    g_object_set(renderer->pipeline, "volume", volume, NULL);
 }

@@ -35,7 +35,6 @@ typedef struct raop_s raop_t;
 
 typedef void (*raop_log_callback_t)(void *cls, int level, const char *msg);
 
-
 typedef struct playback_info_s {
   //char * uuid;
     uint32_t stallcount;
@@ -61,10 +60,12 @@ typedef enum video_codec_e {
 } video_codec_t;
 
 typedef enum reset_type_e {
-  RESET_TYPE_NOHOLD,
-  RESET_TYPE_RTP_SHUTDOWN,
-  RESET_TYPE_HLS_SHUTDOWN,
-  RESET_TYPE_HLS_EOS
+    RESET_TYPE_NOHOLD,
+    RESET_TYPE_RTP_SHUTDOWN,
+    RESET_TYPE_HLS_SHUTDOWN,
+    RESET_TYPE_HLS_EOS,
+    RESET_TYPE_ON_VIDEO_PLAY,
+    RESET_TYPE_RTP_TO_HLS_TEARDOWN
 } reset_type_t;
 
 struct raop_callbacks_s {
@@ -82,7 +83,7 @@ struct raop_callbacks_s {
     /* Optional but recommended callback functions (probably not optional, check this)*/
     void  (*conn_init)(void *cls);
     void  (*conn_destroy)(void *cls);
-    void  (*conn_teardown)(void *cls, bool *teardown_96, bool *teardown_110 );
+  //void  (*conn_teardown)(void *cls, bool *teardown_96, bool *teardown_110 ); /*not used */
     void  (*audio_flush)(void *cls);
     void  (*video_flush)(void *cls);
     double (*audio_set_client_volume)(void *cls);
@@ -94,7 +95,7 @@ struct raop_callbacks_s {
     void  (*audio_set_progress)(void *cls, uint32_t *start, uint32_t *curr, uint32_t *end);
     void  (*audio_get_format)(void *cls, unsigned char *ct, unsigned short *spf, bool *usingScreen, bool *isMedia, uint64_t *audioFormat);
     void  (*video_report_size)(void *cls, float *width_source, float *height_source, float *width, float *height);
-    void  (*mirror_video_activity)(void *cls, double *txusage);
+    void  (*mirror_video_running)(void *cls, bool is_running);
     void  (*report_client_request) (void *cls, char *deviceid, char *model, char *name, bool *admit);
     void  (*display_pin) (void *cls, char * pin);
     void  (*register_client) (void *cls, const char *device_id, const char *pk_str, const char *name);
@@ -116,10 +117,10 @@ raop_ntp_t *raop_ntp_init(logger_t *logger, raop_callbacks_t *callbacks, const c
                           int remote_addr_len, unsigned short timing_rport,
                           timing_protocol_t *time_protocol);
 
-airplay_video_t *airplay_video_init(raop_t *raop, unsigned short port, const char *lang);
-char *raop_get_lang(raop_t *raop);
+airplay_video_t *airplay_video_init(raop_t *raop, unsigned short port, const char *lang, const char *lang_subtitles, const char* lang_system);
 uint64_t get_local_time();
 void raop_handle_eos(raop_t *raop);
+void ntp_global_init(void);
 
 RAOP_API raop_t *raop_init(raop_callbacks_t *callbacks);
 RAOP_API int raop_init2(raop_t *raop, int nohold, const char *device_id, const char *keyfile);
@@ -127,7 +128,7 @@ RAOP_API void raop_set_log_level(raop_t *raop, int level);
 RAOP_API void raop_set_log_callback(raop_t *raop, raop_log_callback_t callback, void *cls);
 RAOP_API int raop_set_plist(raop_t *raop, const char *plist_item, const int value);
 RAOP_API void raop_set_port(raop_t *raop, unsigned short port);
-RAOP_API void raop_set_lang(raop_t *raop, const char *lang);
+RAOP_API void raop_set_lang(raop_t *raop, const char *lang, const char *lang_subtitles, const char *lang_system);
 RAOP_API void raop_set_udp_ports(raop_t *raop, unsigned short port[3]);
 RAOP_API void raop_set_tcp_ports(raop_t *raop, unsigned short port[2]);
 RAOP_API unsigned short raop_get_port(raop_t *raop);

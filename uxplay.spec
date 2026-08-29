@@ -1,5 +1,6 @@
+# uncomment lines about avahi if build with dns-sd.h
 Name:           uxplay
-Version:        1.73
+Version:        1.74
 Release:        1%{?dist}
 
 %global gittag  v%{version}
@@ -15,14 +16,14 @@ BuildRequires:  cmake >= 3.5
 BuildRequires:  make
 BuildRequires:  gcc
 BuildRequires:  gcc-c++
-Requires:       avahi
+#Requires:       avahi
 
 #RedHat and clones 
 %if %{defined fedora} || %{defined rhel}
 BuildRequires:  pkgconf
 BuildRequires:  openssl-devel >= 3.0
 BuildRequires:  libplist-devel >= 2.0
-BuildRequires:  avahi-compat-libdns_sd-devel
+#BuildRequires:  avahi-compat-libdns_sd-devel
 BuildRequires:  gstreamer1-devel
 BuildRequires:  gstreamer1-plugins-base-devel
 Requires:       openssl-libs >= 3.0
@@ -39,7 +40,7 @@ Requires:       gstreamer1-libav
 BuildRequires:  pkg-config
 BuildRequires:  libopenssl-3-devel
 BuildRequires:  libplist-2_0-devel
-BuildRequires:  avahi-compat-mDNSResponder-devel
+#BuildRequires:  avahi-compat-mDNSResponder-devel
 BuildRequires:  gstreamer-devel
 BuildRequires:  gstreamer-plugins-base-devel
 Requires:       libopenssl3
@@ -71,7 +72,7 @@ Requires:       %{mklibname openssl3}
 %endif
 %endif
 BuildRequires:  %{mklibname plist-devel} >= 2.0
-BuildRequires:  %{mklibname avahi-compat-libdns_sd-devel}
+#BuildRequires:  %{mklibname avahi-compat-libdns_sd-devel}
 %if %{defined omvver}
 BuildRequires:  %{mklibname gstreamer-devel}
 BuildRequires:  %{mklibname gst-plugins-base1.0-devel}
@@ -124,12 +125,15 @@ cd build
 %files
 %{_bindir}/uxplay
 %{_bindir}/uxplay-beacon.py
+%{_bindir}/uxplay_beacon_module_BlueZ.py
+%{_bindir}/uxplay_beacon_module_BleuIO.py
+%{_bindir}/uxplay_beacon_module_HCI.py
 %{_mandir}/man1/uxplay.1*
 %{_mandir}/man1/uxplay-beacon.1*
 
 %doc
 %{_docdir}/%{name}/README.txt
-%{_docdir}/%{name}/README.html
+#%{_docdir}/%{name}/README.html
 %{_docdir}/%{name}/README.md
 %{_docdir}/%{name}/systemd/uxplay.service
 
@@ -138,6 +142,11 @@ cd build
 %{_docdir}/%{name}/llhttp/LICENSE-MIT
 
 %changelog
+* Thu June 25 2026 maintainer <https://github.com/FDH2/UxPlay>
+  Update for 1.74 release
+  Comment out references to avahi, for build using internal mdns
+* Wed Feb 11 2026 UxPlay maintainer <https://github.com/FDH2/UxPlay>
+  Update for 1.73.2 release
 * Tue Jan 27 2026 UxPlay maintainer <https://github.com/FDH2/UxPlay>
   Update for 1.73 release
 * Mon Jul 7 2025 UxPlay maintainer <https://github.com/FDH2/UxPlay>

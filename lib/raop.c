@@ -87,14 +87,17 @@ struct raop_s {
   
     /* activate support for HLS live streaming */
     bool hls_support;
-
+    bool hls_pending;
+  
     /* used in digest authentication */
     char *nonce;
     char *random_pw;
     unsigned char auth_fail_count;
 
   /* used for setting HLS video language choices */
-    char *lang;
+    const char *lang;
+    const char *lang_system;
+    const char *lang_subtitles;
 };
 
 struct raop_conn_s {
@@ -424,6 +427,7 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
         } else if (!strcmp(method, "OPTIONS")) {
             handler = &raop_handler_options;
         } else if (!strcmp(method, "SETUP")) {
+            raop->hls_pending = false;
             handler = &raop_handler_setup;
         } else if (!strcmp(method, "GET_PARAMETER")) {
             handler = &raop_handler_get_parameter;
@@ -459,6 +463,7 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
             }
         } else if (!strcmp(method, "GET")) {
             if (!strcmp(url, "/server-info")) {
+                raop->hls_pending = true;
                 handler = &http_handler_server_info;
             } else if (!strcmp(url, "/playback-info")) {
                 handler = &http_handler_playback_info;
@@ -487,7 +492,6 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
         }
     }
     http_response_finish(*response, response_data, response_datalen);
-
     int len = 0;
     const char *data = http_response_get_data(*response, &len);
     if (response_data && response_datalen > 0) {
@@ -635,10 +639,13 @@ raop_init(raop_callbacks_t *callbacks) {
     raop->audio_delay_micros = 250000;
 
     raop->hls_support = false;
-
+    raop->hls_pending = false;
+    
     raop->nonce = NULL;
 
     raop->lang = NULL;
+    raop->lang_subtitles = NULL;
+    raop->lang_system = NULL;
     return raop;
 }
 
@@ -703,10 +710,6 @@ raop_destroy(raop_t *raop) {
         }
         if (raop->random_pw) {
             free(raop->random_pw);
-        }
-
-        if (raop->lang) {
-            free(raop->lang);
         }
 
         free(raop);
@@ -817,20 +820,14 @@ raop_set_dnssd(raop_t *raop, dnssd_t *dnssd) {
 }
 
 void
-raop_set_lang(raop_t *raop, const char *lang) {
-    if (raop->lang) {
-        free (raop->lang);
-        raop->lang = NULL;
-    }
+raop_set_lang(raop_t *raop, const char *lang, const char *lang_subtitles, const char *lang_system) {
     if (lang && strlen(lang)) {
-        raop->lang = (char *) calloc(strlen(lang) + 1, sizeof(char));
-        memcpy(raop->lang, lang, strlen(lang));
+        raop->lang = lang;
     }
-}
-
-char *
-raop_get_lang(raop_t *raop) {
-    return raop->lang;
+    if (lang_subtitles && strlen(lang_subtitles)) {
+        raop->lang_subtitles = lang_subtitles;
+    }
+    raop->lang_system = lang_system;
 }
 
 int
@@ -883,4 +880,8 @@ void raop_handle_eos(raop_t *raop) {
 
 uint64_t get_local_time() {
     return raop_ntp_get_local_time();
+}
+
+void ntp_global_init(void) {
+    raop_ntp_global_init();
 }

@@ -165,7 +165,7 @@ raop_handler_info(raop_conn_t *conn,
         goto finished;
     }
 
-    plist_t initial_volume_node = plist_new_real(-15.0);  //inital audio volume: -15.0dB (50% volume) 
+    plist_t initial_volume_node = plist_new_real(raop->callbacks.audio_set_client_volume(raop->callbacks.cls)); 
     plist_dict_set_item(res_node, "initialVolume", initial_volume_node);
       
     plist_t audio_latencies_node = plist_new_array();
@@ -691,7 +691,7 @@ raop_handler_setup(raop_conn_t *conn,
                 char nonce_string[33] = { '\0' };
                 //bool stale = false;  //not implemented
                 if (len && authorization) {
-                    char *ptr = strstr(authorization, "nonce=\"") +  strlen("nonce=\"");
+                    const char *ptr = strstr(authorization, "nonce=\"") +  strlen("nonce=\"");
                     strncpy(nonce_string, ptr, 32);
                     const char *method = http_request_get_method(request);
                     conn->authenticated = pairing_digest_verify(method, authorization, password);
@@ -726,7 +726,7 @@ raop_handler_setup(raop_conn_t *conn,
                     unsigned char nonce[16] = { '\0' };
                     int len = 16;
                     uint64_t now = raop_ntp_get_local_time();
-                    assert (!pairing_session_make_nonce(conn->session, &now, url, nonce, len));
+                    pairing_session_make_nonce(conn->session, &now, url, nonce, len);
                     if (raop->nonce) {
                         free(raop->nonce);
                     }
@@ -946,6 +946,7 @@ raop_handler_setup(raop_conn_t *conn,
             switch (type) {
             case 110: {
                 // Mirroring
+                raop_destroy_airplay_video(raop, -1);  //cleanup any hls data still present when mirror video starts
                 unsigned short dport = raop->mirror_data_lport;
                 plist_t stream_id_node = plist_dict_get_item(req_stream_node, "streamConnectionID");
                 uint64_t stream_connection_id = 0;
@@ -1137,7 +1138,12 @@ raop_handler_set_parameter(raop_conn_t *conn,
             if ((datalen >= 8) && !strncmp(datastr, "volume: ", 8)) {
                 float vol = 0.0f;
                 sscanf(datastr+8, "%f", &vol);
-                raop_rtp_set_volume(conn->raop_rtp, vol);
+                if (raop_rtp_is_running(conn->raop_rtp)) {
+                    raop_rtp_set_volume(conn->raop_rtp, vol);
+                } else if (raop->callbacks.audio_set_volume) {
+                    /* set volume in playbin (hls) */
+                    raop->callbacks.audio_set_volume(raop->callbacks.cls, vol);
+                }
             } else if ((datalen >= 10) && !strncmp(datastr, "progress: ", 10)) {
                 uint32_t start = 0, curr = 0, end = 0;
                 sscanf(datastr+10, "%"PRIu32"/%"PRIu32"/%"PRIu32, &start, &curr, &end);
@@ -1277,7 +1283,11 @@ raop_handler_teardown(raop_conn_t *conn,
             }
         }
     } else if (teardown_110) {
-        raop->callbacks.video_reset(raop->callbacks.cls, RESET_TYPE_RTP_SHUTDOWN);
+        if (raop->hls_pending) {
+            raop->callbacks.video_reset(raop->callbacks.cls, RESET_TYPE_RTP_TO_HLS_TEARDOWN);
+        } else {
+            raop->callbacks.video_reset(raop->callbacks.cls, RESET_TYPE_RTP_SHUTDOWN);
+        }
         if (conn->raop_rtp_mirror) {
         /* Stop our video RTP session */
             raop_rtp_mirror_stop(conn->raop_rtp_mirror);
@@ -1297,8 +1307,5 @@ raop_handler_teardown(raop_conn_t *conn,
         if (hls_count) {
             raop->callbacks.video_reset(raop->callbacks.cls, RESET_TYPE_HLS_SHUTDOWN);
         }
-    }
-    if (raop->callbacks.conn_teardown) {
-        raop->callbacks.conn_teardown(raop->callbacks.cls, &teardown_96, &teardown_110);
     }
 }
