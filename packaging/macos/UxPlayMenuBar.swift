@@ -27,7 +27,10 @@ enum BundleLayout {
     static let contents = Bundle.main.bundleURL.appendingPathComponent("Contents", isDirectory: true)
     static let macOS = contents.appendingPathComponent("MacOS", isDirectory: true)
     static let plugins = contents.appendingPathComponent("PlugIns", isDirectory: true)
+    static let frameworks = contents.appendingPathComponent("Frameworks", isDirectory: true)
     static let resources = contents.appendingPathComponent("Resources", isDirectory: true)
+    /// DYLD-inserted into uxplay-bin so GStreamer's NSApp stays out of the Dock.
+    static let noDockLib = frameworks.appendingPathComponent("libuxplaynodock.dylib")
 
     static let uxplayBin = macOS.appendingPathComponent("uxplay-bin")
     static let scanner = macOS.appendingPathComponent("gst-plugin-scanner")
@@ -171,6 +174,13 @@ final class ServerController {
         env["GST_REGISTRY_1_0"] = registry
         if FileManager.default.fileExists(atPath: BundleLayout.fonts.path) {
             env["FONTCONFIG_PATH"] = BundleLayout.fonts.path
+        }
+
+        // Keep the GStreamer helper out of the Dock (it is a menu-bar app).
+        if FileManager.default.fileExists(atPath: BundleLayout.noDockLib.path) {
+            let existing = env["DYLD_INSERT_LIBRARIES"]
+            env["DYLD_INSERT_LIBRARIES"] = existing.map { "\($0):\(BundleLayout.noDockLib.path)" }
+                ?? BundleLayout.noDockLib.path
         }
 
         // Base arguments (identical to run-uxplay.sh) plus optional UXPLAY_ARGS.

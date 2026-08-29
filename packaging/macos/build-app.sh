@@ -132,6 +132,13 @@ xcrun swiftc -O -target "$ARCH-apple-macos13.0" \
     -o "$MACOS/UxPlay" "$PKG_DIR/UxPlayMenuBar.swift"
 chmod 755 "$MACOS/UxPlay"
 
+log "Compiling the no-Dock shim -> $FRAMEWORKS/libuxplaynodock.dylib (arm64)"
+mkdir -p "$FRAMEWORKS"
+xcrun clang -dynamiclib -arch "$ARCH" -mmacosx-version-min=13.0 \
+    -framework AppKit -framework Foundation \
+    -install_name @rpath/libuxplaynodock.dylib \
+    -o "$FRAMEWORKS/libuxplaynodock.dylib" "$PKG_DIR/nodock.m"
+
 # ---------------------------------------------------------------------------
 # Collect transitive dylib dependencies from the framework
 # ---------------------------------------------------------------------------
