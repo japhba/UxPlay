@@ -8,6 +8,8 @@
 	<string>UxPlay</string>
 	<key>CFBundleExecutable</key>
 	<string>UxPlay</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.japhba.uxplay</string>
 	<key>CFBundleInfoDictionaryVersion</key>

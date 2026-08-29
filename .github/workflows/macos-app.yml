@@ -60,6 +60,15 @@ jobs:
           files: dist/UxPlay-*-macos-arm64.zip
           generate_release_notes: true
           body: |
-            Self-contained macOS app (Apple Silicon). Download the zip, unzip,
-            and right-click > Open on first launch (the build is not notarized;
-            see the "Download the macOS app" section of the README).
+            Self-contained macOS **menu bar** app (Apple Silicon). Download the
+            zip, unzip, and drag **UxPlay.app to /Applications**, then
+            right-click > Open on first launch (the build is not notarized).
+
+            The AirPlay receiver runs in the background; the pairing PIN and
+            status appear in the menu bar, and the app can update itself from
+            these releases (**Check for Updates…**) when it lives in
+            /Applications. See the "Download the macOS app" section of the
+            README for details.
+
+            The release asset is named `UxPlay-<version>-macos-arm64.zip`; the
+            in-app updater looks for exactly that name, so keep the pattern.

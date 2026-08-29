@@ -64,9 +64,10 @@ die()  { printf 'error: %s\n' "$*" >&2; exit 1; }
 
 [ "$(uname -s)" = Darwin ] || die "this script only runs on macOS"
 [ -d "$GST_FW/lib" ] || die "GStreamer framework not found at $GST_FW (install the official runtime + devel .pkg)"
-for tool in cmake otool install_name_tool lipo codesign ditto; do
+for tool in cmake otool install_name_tool lipo codesign ditto xcrun iconutil sips; do
     command -v "$tool" >/dev/null || die "missing tool: $tool"
 done
+xcrun --find swiftc >/dev/null 2>&1 || die "missing tool: swiftc (install the Xcode command line tools)"
 
 # ---------------------------------------------------------------------------
 # Version
@@ -104,13 +105,32 @@ done
 sed -e "s/@SHORT_VERSION@/$SHORT_VERSION/g" -e "s/@BUNDLE_VERSION@/$VERSION/g" \
     "$PKG_DIR/Info.plist.in" > "$CONTENTS/Info.plist"
 printf 'APPL????' > "$CONTENTS/PkgInfo"
-install -m 755 "$PKG_DIR/UxPlay-launcher.sh" "$MACOS/UxPlay"
+# run-uxplay.sh stays in the bundle for CLI/debug use; the CFBundleExecutable
+# is now the Swift menu-bar app (compiled below), not the Terminal launcher.
 install -m 755 "$PKG_DIR/run-uxplay.sh" "$RESOURCES/run-uxplay.sh"
 # fontconfig configuration for the pango textoverlay element (cover art mode)
 cp -R "$GST_FW/etc/fonts" "$RESOURCES/fonts"
 cp "$ROOT/LICENSE" "$RESOURCES/LICENSE"
 cp "$ROOT/README.md" "$RESOURCES/README.md"
 [ -f "$ROOT/uxplay.1" ] && cp "$ROOT/uxplay.1" "$RESOURCES/uxplay.1"
+
+# ---------------------------------------------------------------------------
+# App icon + menu-bar template, then the Swift menu-bar app itself
+# ---------------------------------------------------------------------------
+log "Generating app icon and menu-bar template image"
+ICON_TMP="$BUILD_DIR/icons"
+rm -rf "$ICON_TMP"
+xcrun swift "$PKG_DIR/make-icons.swift" "$ICON_TMP"
+cp "$ICON_TMP/AppIcon.icns"          "$RESOURCES/AppIcon.icns"
+cp "$ICON_TMP/menubarTemplate.png"    "$RESOURCES/menubarTemplate.png"
+cp "$ICON_TMP/menubarTemplate@2x.png" "$RESOURCES/menubarTemplate@2x.png"
+
+log "Compiling the menu-bar app -> $MACOS/UxPlay (arm64)"
+# Single-file AppKit app; links AppKit/Foundation automatically, no extra
+# frameworks (notifications use the dependency-free NSUserNotification).
+xcrun swiftc -O -target "$ARCH-apple-macos13.0" \
+    -o "$MACOS/UxPlay" "$PKG_DIR/UxPlayMenuBar.swift"
+chmod 755 "$MACOS/UxPlay"
 
 # ---------------------------------------------------------------------------
 # Collect transitive dylib dependencies from the framework
@@ -226,6 +246,39 @@ done
 codesign --force "${sign_args[@]}" "$APP"
 codesign --verify --deep --strict --verbose=1 "$APP"
 printf '   signature verified\n'
+
+# ---------------------------------------------------------------------------
+# Verify the menu-bar app and the icons
+# ---------------------------------------------------------------------------
+log "Verifying: menu-bar app and app icon"
+[ -x "$MACOS/UxPlay" ] || die "menu-bar executable $MACOS/UxPlay missing or not executable"
+lipo -archs "$MACOS/UxPlay" | grep -qw "$ARCH" || die "$MACOS/UxPlay is not $ARCH (got: $(lipo -archs "$MACOS/UxPlay"))"
+# It must link only the OS AppKit/Foundation/Swift runtime, nothing bundled.
+if otool -L "$MACOS/UxPlay" | tail -n +2 | awk '{print $1}' | grep -vqE '^(/usr/lib/|/System/)'; then
+    die "menu-bar app links non-system libraries:\n$(otool -L "$MACOS/UxPlay")"
+fi
+otool -L "$MACOS/UxPlay" | grep -q 'AppKit.framework' || die "menu-bar app is not linked against AppKit"
+codesign --verify --strict --verbose=1 "$MACOS/UxPlay" || die "menu-bar app failed signature verification"
+# AppIcon.icns must be a valid 1024px icns (sips reads it, iconutil round-trips).
+icon_w="$(sips -g pixelWidth "$RESOURCES/AppIcon.icns" 2>/dev/null | awk '/pixelWidth/{print $2}')"
+[ "${icon_w:-0}" = 1024 ] || die "AppIcon.icns is not a valid 1024px icns (pixelWidth=$icon_w)"
+iconutil -c iconset "$RESOURCES/AppIcon.icns" -o "$BUILD_DIR/icons-roundtrip.iconset" \
+    || die "AppIcon.icns failed iconutil round-trip (corrupt icns)"
+rm -rf "$BUILD_DIR/icons-roundtrip.iconset"
+for tpl in menubarTemplate.png menubarTemplate@2x.png; do
+    [ -f "$RESOURCES/$tpl" ] || die "menu-bar template $tpl missing from Resources"
+done
+sips -g pixelWidth "$RESOURCES/menubarTemplate.png" | grep -q 'pixelWidth: 18' || die "menubarTemplate.png is not 18px"
+plutil -extract CFBundleIconFile raw "$CONTENTS/Info.plist" | grep -qx AppIcon || die "CFBundleIconFile is not set to AppIcon in Info.plist"
+printf '   menu-bar app is %s, links only system frameworks, signature OK; AppIcon.icns is a valid 1024px icns\n' "$ARCH"
+# Exercise the app's pure runtime logic (PIN/line parsing, version comparison,
+# release-asset matching, argument splitting) headlessly -- no GUI required.
+"$MACOS/UxPlay" --self-test || die "menu-bar app --self-test failed"
+printf '   menu-bar app --self-test passed\n'
+# NOTE: a full launch of the status-bar app needs a GUI (Aqua) session, which
+# CI does not have; we verify it compiles, links, is arm64, is signed, and that
+# its logic self-test passes.  Interactive menu behavior (status item, PIN
+# display, updater dialogs) is exercised manually (see the README / PR notes).
 
 # ---------------------------------------------------------------------------
 # Verification: run the bundled binaries with the bundled runtime only

@@ -39,19 +39,46 @@ Alternatively, remove the quarantine flag in a terminal:
 
     xattr -dr com.apple.quarantine /Applications/UxPlay.app
 
-**What it does:** on launch the app opens a Terminal window running
+**What it does:** UxPlay runs as a **menu bar app** -- there is no Dock icon
+and no Terminal window.  An AirPlay glyph appears in the menu bar and the
+receiver starts automatically, running
 
     uxplay -p2p -h265 -vsync no -vs "osxvideosink force-aspect-ratio=true"
 
-and shows the one-time PIN there; on the iPad/iPhone pick the receiver in
-Screen Mirroring and enter the PIN.  `-p2p` advertises the receiver over AWDL
-(peer-to-peer WiFi) as well as the local network, so it also works on networks
-that block mDNS (e.g. eduroam).  Keep the Terminal window open while
-mirroring; press Ctrl-C in it (or close it) to stop the server.
+`-p2p` advertises the receiver over AWDL (peer-to-peer WiFi) as well as the
+local network, so it also works on networks that block mDNS (e.g. eduroam).
+
+On the iPad/iPhone pick the receiver in Screen Mirroring.  When it asks to
+pair, the **one-time PIN is shown next to the menu bar icon**, in the menu
+(**Pairing PIN: NNNN**, click to copy), and as a notification -- type it as
+the AirPlay password.  Once connected the menu shows **Streaming from &lt;your
+device&gt;**.
+
+**The menu** (click the menu bar icon) has: the current status, the pairing
+PIN while pairing, **Restart Server**, **Stop / Start Server**, **Show Log**
+(opens `~/Library/Logs/UxPlay/uxplay.log`), **Open AirPlay Receiver
+Settings**, **Check for Updates…**, the running version, and **Quit**.
+Quitting (or an external kill) always stops the background receiver, so no
+orphaned process is left behind.  Put default extra options in `~/.uxplayrc`
+or the `UXPLAY_ARGS` environment variable (see below).
 
 **Requirements:** macOS 13+ on Apple Silicon, and AirPlay Receiver enabled in
 **System Settings → General → AirDrop & Continuity** (uxplay reports the
-current state of this setting when it starts).
+current state of this setting when it starts).  If the receiver is off the
+menu shows **Enable AirPlay Receiver in System Settings** with a shortcut to
+open it.
+
+**Updating:** the app checks GitHub Releases for a newer version at most once
+a day, and you can check any time with **Check for Updates…**.  If a newer
+build is available it offers to download and replace itself, then relaunch.
+For self-update to work the app must live somewhere writable and **not be
+"translocated"**: drag `UxPlay.app` to **`/Applications`** and open it from
+there (running it from the read-only Downloads/quarantine location makes macOS
+run a temporary copy that cannot update itself -- the app detects this and
+sends you to the download page instead).  Because the build is only ad-hoc
+signed (no Developer ID / notarization), the updater cannot verify a code
+signature on the download; it relies on the HTTPS connection to GitHub for
+authenticity.
 
 **Extra options:** put default options in a `~/.uxplayrc` startup file (one
 option per line, see below), set them in the `UXPLAY_ARGS` environment
