@@ -22,6 +22,7 @@
 
 #include <gst/gst.h>
 #include <gst/app/gstappsrc.h>
+#include <pthread.h>
 #include "video_renderer.h"
 
 #define SECOND_IN_NSECS 1000000000UL
@@ -94,6 +95,10 @@ struct video_renderer_s {
 };
 
 static video_renderer_t *renderer = NULL;
+/* serialises access to the global "renderer" pointer between the RAOP mirror
+ * thread (video_renderer_render_buffer) and the main thread that creates and
+ * destroys renderers on (re)connect, preventing a use-after-free. */
+static pthread_mutex_t renderer_mutex = PTHREAD_MUTEX_INITIALIZER;
 static video_renderer_t *renderer_type[NCODECS] = {0};
 static int n_renderers = NCODECS;
 static char h264[] = "h264";
@@ -526,7 +531,9 @@ void video_renderer_start() {
         state_name = gst_element_state_get_name(state);
         logger_log(logger, LOGGER_DEBUG, "video renderer_start: renderer %d %p state %s", i, renderer_type[i], state_name);
     }
+    pthread_mutex_lock(&renderer_mutex);
     renderer = NULL;
+    pthread_mutex_unlock(&renderer_mutex);
     first_packet = true;
 #ifdef X_DISPLAY_FIX
     X11_search_attempts = 0;
@@ -634,7 +641,9 @@ uint64_t video_renderer_render_buffer(unsigned char* data, int *data_len, int *n
             logger_log(logger, LOGGER_INFO, "Begin streaming to GStreamer video pipeline");
             first_packet = false;
         }
+        pthread_mutex_lock(&renderer_mutex);
         if (!renderer || !(renderer->appsrc)) {
+            pthread_mutex_unlock(&renderer_mutex);
             logger_log(logger, LOGGER_DEBUG, "*** no video renderer found");
             return 0;
         }
@@ -659,6 +668,7 @@ uint64_t video_renderer_render_buffer(unsigned char* data, int *data_len, int *n
             }
         }
 #endif
+        pthread_mutex_unlock(&renderer_mutex);
     }
     return 0;
 }
@@ -762,11 +772,16 @@ static void video_renderer_destroy_instance(video_renderer_t *renderer) {
 }
 
 void video_renderer_destroy() {
+    pthread_mutex_lock(&renderer_mutex);
+    renderer = NULL;
     for (int i = 0; i < n_renderers; i++) {
         if (renderer_type[i]) {
-            video_renderer_destroy_instance(renderer_type[i]);
+            video_renderer_t *r = renderer_type[i];
+            renderer_type[i] = NULL;
+            video_renderer_destroy_instance(r);
         }
     }
+    pthread_mutex_unlock(&renderer_mutex);
 }
 
 static void get_stream_status_name(GstStreamStatusType type, char *name, size_t len) {
@@ -1060,15 +1075,20 @@ int video_renderer_choose_codec (bool video_is_jpeg, bool video_is_h265) {
     }
     if (renderer_used == NULL) {
         return -1;
-    } else if (renderer_used == renderer) {
+    }
+    pthread_mutex_lock(&renderer_mutex);
+    if (renderer_used == renderer) {
+        pthread_mutex_unlock(&renderer_mutex);
         return 0;
     } else if (renderer) {
+        pthread_mutex_unlock(&renderer_mutex);
         return -1;
     }
     renderer = renderer_used;
     gst_element_set_state (renderer->pipeline, GST_STATE_PLAYING);
     GstState old_state, new_state;
     if (gst_element_get_state(renderer->pipeline, &old_state, &new_state, 100 * GST_MSECOND) == GST_STATE_CHANGE_FAILURE) {
+        pthread_mutex_unlock(&renderer_mutex);
         g_error("video pipeline failed to go into playing state");
         return -1;
     }
@@ -1089,6 +1109,7 @@ int video_renderer_choose_codec (bool video_is_jpeg, bool video_is_h265) {
             video_renderer_destroy_instance(renderer_unused);
         }
     }
+    pthread_mutex_unlock(&renderer_mutex);
     return 0;
 }
     
